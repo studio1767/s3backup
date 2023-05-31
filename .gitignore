@@ -1,0 +1,13 @@
+# ignore files with no extension
+*
+!*.*
+!*/
+
+# ignore specific directories
+local/
+
+# ignore known files
+*.swp
+.DS_Store
+
+
