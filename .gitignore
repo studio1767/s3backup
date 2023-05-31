@@ -1,9 +1,10 @@
 # ignore files with no extension
-*
-!*.*
-!*/
+cmd/**/*
+!cmd/**/*.*
+!cmd/**/
 
 # ignore specific directories
+bin/
 local/
 
 # ignore known files
