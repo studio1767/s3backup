@@ -95,7 +95,7 @@ An example of this is:
 
 ## Encryption
 
-A very important thing to keep in mind here is that the encryption and decryption all happen on the client side
+A very important thing to keep in mind here is that the encryption and decryption all happens on the client side
 using client managed keys. If the client loses the keys, then the backups will no longer be accessible.
 So, keep them somewhere safe!
 
@@ -227,23 +227,19 @@ To run the backup, run this command:
 
     s3backup -p <my-aws-profile> <backup-bucket-name> <myjobname>
 
-This compares what's in the latest manifest file for the job to what is on disk and detects
-new or modified files. For these files, it calculates the content hash and checks to see
-if the file is already uploaded to the bucket. If it isn't there, it is uploaded.
-
-The manifest that is generated is a full manifest of what is on the disk. In this way,
-we only ever do incremental backups, but we always have a full manifest.
-
 The backup procedure is something like this:
 
 * download the latest job configuration (decrypting as necessary)
 * download the latest manifest file (decrypting as necessary)
 * iterate over the contents of the manifest file and the filesystem together
-* compare the files and metadata of each to determine if a file is new or modified
+* compare the file names and metadata of each to determine if a file is new or modified
 * if the file appears to be new or modified, generate the hash of its content
 * check the bucket for this hash; if it isn't there, upload it
 * keep looping until both the manifest and the filesystem iterators are drained
 * as a final step, upload the new manifest file
+
+The manifest that is generated is a full manifest of what is on the disk. In this way,
+we only ever do incremental uploads/backups, but we always have a full manifest.
 
 ### Restoring Content
 
@@ -254,15 +250,15 @@ for the identities file is:
 
 If it's there, the tool will find it and use it. If it's somewhere else, the location can be overridden on the command line.
 
-To restore you will also need the passphrases of the metadata backup. The infrastructure project generates 
-individual passphrase files for each user, and one containing all passphrases intended for use by an
+To restore you will also need the passphrases used to encrypt the manifest file. The infrastructure project generates 
+individual secrets files with passphrases for each user, and one containing all passphrases intended for use by an
 administrator.
 
 Once all this is in place, run the restore with a command like this:
 
     s3restore -p <my-aws-profile> <backup-bucket-name> <manifest-key> <restore-root> [<pattern>]
 
-The pattern is optional and is a regular expression used to match then file name. It defaults to '.*' to 
+The pattern is optional and is a regular expression used to match the file name. It defaults to '.*' to 
 restore everything in the manifest.
 
 As an example of a selective restore, to restore everything in a manifest under a directory called 
@@ -283,6 +279,7 @@ The restore operation is like this:
 * download the specified manifest file (decrypting as necessary)
 * loop through each entry in the manifest
 * compare the filename to the pattern, and if it matches, download it (decrypting as necessary)
+* set the permissions on the file to match those recorded in the manifest
 
 ### Manual Downloading
 
@@ -292,5 +289,4 @@ it goes. To use it:
     s3download -p myprofile mybucket full-key-to-file restore-directory
 
 By default, it won't overwrite a file that already exists; use the '-o' flag to change that.
-
 
