@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 
@@ -14,7 +15,47 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
+var downloadable = map[string]bool{
+	"":                                 true,
+	string(types.StorageClassStandard): true,
+	string(types.StorageClassReducedRedundancy): true,
+	string(types.StorageClassStandardIa):        true,
+	string(types.StorageClassOnezoneIa):         true,
+}
+
+func (cl *client) checkDownloadable(key string) error {
+	hoo, err := cl.client.HeadObject(context.Background(), &s3.HeadObjectInput{
+		Bucket: cl.bucket,
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var nosuchkey *types.NoSuchKey
+		if errors.As(err, &nosuchkey) {
+			return &ErrNoSuchObject{
+				key: key,
+			}
+		}
+		return err
+	}
+
+	sclass := string(hoo.StorageClass)
+	if downloadable[sclass] {
+		return nil
+	}
+
+	return &ErrNotDownloadable{
+		key:          key,
+		storageClass: sclass,
+	}
+}
+
 func (cl *client) Download(key string, sink io.Writer) (int64, error) {
+
+	// verify we can download the object
+	err := cl.checkDownloadable(key)
+	if err != nil {
+		return 0, err
+	}
 
 	// use the simple GetObject method as we won't have a io.WriterAt interface
 	//   to use the manager/paraller downloader

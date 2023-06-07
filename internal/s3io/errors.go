@@ -61,3 +61,12 @@ type ErrNoMatch struct {
 func (e *ErrNoMatch) Error() string {
 	return e.msg
 }
+
+type ErrNotDownloadable struct {
+	key          string
+	storageClass string
+}
+
+func (e *ErrNotDownloadable) Error() string {
+	return fmt.Sprintf("object is not downloadable: storage class is %s", e.storageClass)
+}
