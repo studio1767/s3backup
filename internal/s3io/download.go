@@ -4,7 +4,6 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
-	"fmt"
 	"io"
 	"strings"
 
