@@ -10,9 +10,11 @@ vpath %.go $(wildcard cmd/*)
 
 all: $(TARGETS)
 
+.PHONY: $(COMMANDS)
 $(COMMANDS):
 	make bin/$@
 
+.PHONY: $(TARGETS)
 $(TARGETS): bin/%: %.go
 	mkdir -p $(dir $@)
 	cd $(dir $<) && go build -o $(ROOTDIR)/$@
