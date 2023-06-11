@@ -54,9 +54,6 @@ func (cl *client) UploadPassphrase(key string, source io.Reader, compress bool) 
 
 func (cl *client) upload(key string, source io.Reader, compress, encrypt, scrypt bool) (int64, error) {
 
-	// create a context to cancel the upload in case of errors
-	ctx, cancel := context.WithCancel(context.Background())
-
 	// create the map for metadata
 	mdata := make(map[string]string)
 
@@ -67,14 +64,19 @@ func (cl *client) upload(key string, source io.Reader, compress, encrypt, scrypt
 		mdata["s3bu-compress-version"] = "001"
 
 		reader, writer := io.Pipe()
+		defer reader.Close()
 
-		go func(writer io.WriteCloser, source io.Reader) {
-			defer writer.Close()
-
+		go func(writer *io.PipeWriter, source io.Reader) {
 			gzwriter := gzip.NewWriter(writer)
-			defer gzwriter.Close()
 
-			io.Copy(gzwriter, source)
+			_, err := io.Copy(gzwriter, source)
+
+			gzwriter.Close()
+			if err != nil {
+				writer.CloseWithError(err)
+			} else {
+				writer.Close()
+			}
 
 		}(writer, source)
 
@@ -87,18 +89,23 @@ func (cl *client) upload(key string, source io.Reader, compress, encrypt, scrypt
 		mdata["s3bu-encrypt-version"] = "001"
 
 		reader, writer := io.Pipe()
+		defer reader.Close()
 
-		go func(writer io.WriteCloser, source io.Reader) {
-			defer writer.Close()
-
+		go func(writer *io.PipeWriter, source io.Reader) {
 			ewriter, err := age.Encrypt(writer, cl.recipients...)
 			if err != nil {
-				cancel()
+				writer.CloseWithError(err)
 				return
 			}
-			defer ewriter.Close()
 
-			io.Copy(ewriter, source)
+			_, err = io.Copy(ewriter, source)
+
+			ewriter.Close()
+			if err != nil {
+				writer.CloseWithError(err)
+			} else {
+				writer.Close()
+			}
 
 		}(writer, source)
 
@@ -120,18 +127,23 @@ func (cl *client) upload(key string, source io.Reader, compress, encrypt, scrypt
 		mdata["s3bu-scrypt-id"] = passkey
 
 		reader, writer := io.Pipe()
+		defer reader.Close()
 
-		go func(writer io.WriteCloser, source io.Reader, recipient age.Recipient) {
-			defer writer.Close()
-
+		go func(writer *io.PipeWriter, source io.Reader, recipient age.Recipient) {
 			ewriter, err := age.Encrypt(writer, recipient)
 			if err != nil {
-				cancel()
+				writer.CloseWithError(err)
 				return
 			}
-			defer ewriter.Close()
 
-			io.Copy(ewriter, source)
+			_, err = io.Copy(ewriter, source)
+
+			ewriter.Close()
+			if err != nil {
+				writer.CloseWithError(err)
+			} else {
+				writer.Close()
+			}
 
 		}(writer, source, recipient)
 
@@ -146,7 +158,10 @@ func (cl *client) upload(key string, source io.Reader, compress, encrypt, scrypt
 	// can't use the simple PutObject method because don't know the ContentLength
 	// in advance so use an Uploader...
 
+	ctx := context.Background()
+
 	uploader := manager.NewUploader(cl.client)
+
 	_, err := uploader.Upload(ctx, &s3.PutObjectInput{
 		Bucket:   cl.bucket,
 		Key:      aws.String(key),
