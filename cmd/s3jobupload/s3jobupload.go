@@ -38,7 +38,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// run the restore for the manifest
+	// upload the jobfile
 	key, err := upload(client, jobname, jobfile)
 	if err != nil {
 		log.Fatal(err)
